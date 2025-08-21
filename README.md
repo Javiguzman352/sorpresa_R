@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ramo de Flores Neón Animado</title>
+  <style>
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      background: #0b0f1a; 
+      font-family: 'Arial Rounded MT Bold', 'Arial', sans-serif; 
+      overflow: hidden;
+    }
+    .wrap { 
+      display:flex; 
+      flex-direction:column; 
+      height:100%; 
+    }
+    header { 
+      color:#e2e8f0; 
+      padding:14px 18px; 
+      display:flex; 
+      gap:12px; 
+      align-items:center; 
+      justify-content:space-between; 
+      backdrop-filter: blur(6px); 
+      background: linear-gradient(90deg, rgba(20,24,38,.75), rgba(20,24,38,.35)); 
+      border-bottom: 1px solid rgba(255,255,255,.08); 
+      z-index: 10;
+    }
+    header h1 { 
+      font-size: 24px; 
+      margin: 0; 
+      font-weight: 800; 
+      letter-spacing:.5px; 
+      text-shadow: 0 0 10px rgba(255, 242, 0, 0.5);
+    }
+    header .controls { 
+      display:flex; 
+      gap:8px; 
+      align-items:center; 
+    }
+    button { 
+      appearance:none; 
+      border:1px solid rgba(255,255,255,.18); 
+      background:rgba(255,255,255,.06); 
+      color:#e2e8f0; 
+      padding:12px 18px; 
+      border-radius:14px; 
+      cursor:pointer; 
+      font-weight:600; 
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(255, 242, 0, 0.3);
+    }
+    button:hover { 
+      background:rgba(255,255,255,.12); 
+      box-shadow: 0 0 20px rgba(255, 106, 0, 0.5);
+      transform: translateY(-2px);
+    }
+    canvas { 
+      display:block; 
+      width:100%; 
+      height:100%; 
+      cursor: pointer;
+    }
+    .message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 28px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 1s ease;
+      text-shadow: 0 0 10px #ff00a8;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .message.visible {
+      opacity: 1;
+    }
+    .progress-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #FF00A8, #FF6A00, #FFF200);
+      border-radius: 5px;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>✨ Ramo de Flores Neón Animado ✨</h1>
+      <div class="controls">
+        <button id="btn-ramo">🌻 ten un bonito día!! 🌻</button>
+      </div>
+    </header>
+    <canvas id="lienzo"></canvas>
+    <div class="message" id="message">¡Que tengas un día maravilloso!</div>
+    <div class="progress-container" id="progress-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <script>
+    // Colores neón para las flores
+    const NEON_COLORS = [
+      "#FFF200",  // Amarillo neón
+      "#FF6A00",  // Naranja neón
+      "#FF00A8",  // Rosa neón
+    ];
+
+    // Referencias a elementos del DOM
+    const canvas = document.getElementById("lienzo");
+    const ctx = canvas.getContext("2d");
+    const message = document.getElementById("message");
+    const btnRamo = document.getElementById("btn-ramo");
+    const progressContainer = document.getElementById("progress-container");
+    const progressBar = document.getElementById("progress-bar");
+
+    // Variables de control de animación
+    let animationId = null;
+    let isAnimating = false;
+    let currentStep = 0;
+    let animationElements = [];
+    let animationSpeed = 2; // Velocidad de animación (mayor = más lento)
+
+    // Ajustar tamaño del canvas
+    function ajustarTamano() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight - document.querySelector("header").offsetHeight;
+    }
+
+    // Dibujar fondo con efecto de espacio
+    function fondoSutil() {
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      // Crear gradiente radial para el fondo
+      const grad = ctx.createRadialGradient(
+        w * 0.5, h * 0.5, 0,
+        w * 0.5, h * 0.5, Math.max(w, h) * 0.8
+      );
+      grad.addColorStop(0, "#0b0f1a");
+      grad.addColorStop(0.7, "#070a14");
+      grad.addColorStop(1, "#050710");
+      
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      
+      // Añadir estrellas tenues
+      ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+      for (let i = 0; i < 100; i++) {
+        const x = Math.random() * w;
+        const y = Math.random() * h;
+        const size = Math.random() * 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Dibujar un pétalo
+    function dibujarPetalo(cx, cy, rIn, rOut, ang) {
+      ctx.beginPath();
+      const x1 = cx + rIn * Math.cos(ang);
+      const y1 = cy + rIn * Math.sin(ang);
+      const x2 = cx + rOut * Math.cos(ang);
+      const y2 = cy + rOut * Math.sin(ang);
+      
+      const ctrl1x = cx + (rOut * 0.55) * Math.cos(ang - 0.6);
+      const ctrl1y = cy + (rOut * 0.55) * Math.sin(ang - 0.6);
+      const ctrl2x = cx + (rOut * 0.55) * Math.cos(ang + 0.6);
+      const ctrl2y = cy + (rOut * 0.55) * Math.sin(ang + 0.6);
+
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(ctrl1x, ctrl1y, x2, y2);
+      ctx.quadraticCurveTo(ctrl2x, ctrl2y, x1, y1);
+      ctx.closePath();
+    }
+
+    // Dibujar una flor completa (con animación paso a paso)
+    function dibujarFlor(cx, cy, baseR, petalos = 8, color = "#FF00A8", progress = 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      
+      // Calcular progreso para animación
+      const petalosCompletos = Math.floor(petalos * progress);
+      const progresoPetaloActual = (petalos * progress) - petalosCompletos;
+      
+      // Efecto de brillo exterior
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 35;
+      
+      // Dibujar pétalos con relleno (animados)
+      for (let i = 0; i < petalosCompletos; i++) {
+        const ang = (i / petalos) * Math.PI * 2;
+        const rIn = baseR * 0.25;
+        const rOut = baseR * (0.9 + Math.random() * 0.25);
+        dibujarPetalo(cx, cy, rIn, rOut, ang);
+        ctx.fillStyle = color + "CC";
+        ctx.fill();
+      }
+      
+      // Dibujar el pétalo actual en progreso
+      if (progresoPetaloActual > 0) {
+        const i = petalosCompletos;
+        const ang = (i / petalos) * Math.PI * 2;
+        const rIn = baseR * 0.25;
+        const rOut = baseR * (0.9 + Math.random() * 0.25);
+        
+        // Dibujar pétalo parcialmente
+        ctx.globalAlpha = progresoPetaloActual;
+        dibujarPetalo(cx, cy, rIn, rOut, ang);
+        ctx.fillStyle = color + "CC";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      // Dibujar contornos de pétalos (solo si la flor está completa)
+      if (progress >= 1) {
+        ctx.shadowBlur = 25;
+        ctx.lineWidth = Math.max(2, baseR * 0.08);
+        ctx.strokeStyle = color;
+        for (let i = 0; i < petalos; i++) {
+          const ang = (i / petalos) * Math.PI * 2;
+          const rIn = baseR * 0.25;
+          const rOut = baseR * (0.9 + Math.random() * 0.25);
+          dibujarPetalo(cx, cy, rIn, rOut, ang);
+          ctx.stroke();
+        }
+
+        // Centro de la flor con efecto de brillo
+        ctx.shadowBlur = 45;
+        const grad = ctx.createRadialGradient(
+          cx, cy, baseR * 0.05,
+          cx, cy, baseR * 0.45
+        );
+        grad.addColorStop(0, "#FFFFFF");
+        grad.addColorStop(0.7, color);
+        grad.addColorStop(1, color + "00");
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseR * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Detalles en el centro
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = "#000000";
+        for (let i = 0; i < 6; i++) {
+          const dotX = cx + (baseR * 0.2) * Math.cos(i * Math.PI / 3);
+          const dotY = cy + (baseR * 0.2) * Math.sin(i * Math.PI / 3);
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, baseR * 0.05, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      
+      ctx.restore();
+    }
+
+    // Dibujar tallo (con animación)
+    function dibujarTallo(x1, y1, x2, y2, progress = 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      
+      // Crear una curva natural para el tallo
+      const cpx = (x1 + x2) / 2 + (Math.random() - 0.5) * 40;
+      const cpy = (y1 + y2) / 2 + (Math.random() - 0.5) * 40;
+      
+      // Calcular punto intermedio para animación
+      const currentX = x1 + (x2 - x1) * progress;
+      const currentY = y1 + (y2 - y1) * progress;
+      const currentCPX = x1 + (cpx - x1) * progress;
+      const currentCPY = y1 + (cpy - y1) * progress;
+      
+      ctx.quadraticCurveTo(currentCPX, currentCPY, currentX, currentY);
+      
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#00FF00";
+      ctx.shadowColor = "#00FF00";
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Dibujar hoja (con animación)
+    function dibujarHoja(x, y, size, angle, progress = 1) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      
+      // Ajustar tamaño según progreso
+      const currentSize = size * progress;
+      
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(currentSize * 0.8, -currentSize * 0.5, currentSize, 0);
+      ctx.quadraticCurveTo(currentSize * 0.8, currentSize * 0.5, 0, 0);
+      
+      ctx.fillStyle = "#00CC00";
+      ctx.shadowColor = "#00CC00";
+      ctx.shadowBlur = 15;
+      ctx.globalAlpha = progress; // Transparencia según progreso
+      ctx.fill();
+      
+      ctx.restore();
+    }
+
+    // Preparar elementos de animación
+    function prepararAnimacion() {
+      animationElements = [];
+      const w = canvas.width;
+      const h = canvas.height;
+      const centroX = w * 0.5;
+      const centroY = h * 0.65;
+      const baseY = h * 0.85;
+      
+      // Crear tallos
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const offsetX = Math.cos(angle) * 50;
+        const offsetY = Math.sin(angle) * 30;
+        const florX = centroX + offsetX;
+        const florY = centroY + offsetY;
+        
+        animationElements.push({
+          type: "tallo",
+          x1: centroX, y1: baseY, x2: florX, y2: florY,
+          progress: 0
+        });
+        
+        // Añadir hojas a algunos tallos
+        if (Math.random() > 0.5) {
+          const leafX = (centroX + florX) / 2 + (Math.random() - 0.5) * 30;
+          const leafY = (baseY + florY) / 2 + (Math.random() - 0.5) * 30;
+          animationElements.push({
+            type: "hoja",
+            x: leafX, y: leafY, 
+            size: 20 + Math.random() * 15, 
+            angle: Math.random() * Math.PI * 2,
+            progress: 0
+          });
+        }
+      }
+      
+      // Crear flores exteriores
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const distance = 90 + Math.random() * 60;
+        const florX = centroX + Math.cos(angle) * distance;
+        const florY = centroY + Math.sin(angle) * distance - 20;
+        const r = 25 + Math.random() * 20;
+        const pet = 6 + Math.floor(Math.random() * 7);
+        const color = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+        
+        animationElements.push({
+          type: "flor",
+          x: florX, y: florY, 
+          size: r, 
+          petals: pet, 
+          color: color,
+          progress: 0
+        });
+      }
+      
+      // Flor central más grande
+      const colorCentral = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+      animationElements.push({
+        type: "flor",
+        x: centroX, y: centroY, 
+        size: 70, 
+        petals: 12, 
+        color: colorCentral,
+        progress: 0
+      });
+    }
+
+    // Dibujar un frame de animación
+    function dibujarFrame() {
+      // Limpiar canvas y dibujar fondo
+      fondoSutil();
+      
+      // Dibujar todos los elementos según su progreso actual
+      for (const element of animationElements) {
+        if (element.type === "tallo") {
+          dibujarTallo(element.x1, element.y1, element.x2, element.y2, element.progress);
+        } else if (element.type === "hoja") {
+          dibujarHoja(element.x, element.y, element.size, element.angle, element.progress);
+        } else if (element.type === "flor") {
+          dibujarFlor(element.x, element.y, element.size, element.petals, element.color, element.progress);
+        }
+      }
+      
+      // Actualizar barra de progreso
+      const totalProgress = animationElements.reduce((sum, el) => sum + el.progress, 0) / animationElements.length;
+      progressBar.style.width = `${totalProgress * 100}%`;
+      
+      // Avanzar la animación
+      avanzarAnimacion();
+    }
+
+    // Avanzar el estado de la animación
+    function avanzarAnimacion() {
+      let todasCompletas = true;
+      
+      for (const element of animationElements) {
+        if (element.progress < 1) {
+          element.progress += 0.02 / animationSpeed;
+          todasCompletas = false;
+        } else {
+          element.progress = 1;
+        }
+      }
+      
+      if (!todasCompletas) {
+        animationId = requestAnimationFrame(dibujarFrame);
+      } else {
+        isAnimating = false;
+        progressContainer.style.display = "none";
+        
+        // Mostrar mensaje final
+        message.classList.add("visible");
+        setTimeout(() => {
+          message.classList.remove("visible");
+        }, 3000);
+      }
+    }
+
+    // Iniciar animación
+    function iniciarAnimacion() {
+      if (isAnimating) return;
+      
+      // Detener animación previa si existe
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      
+      isAnimating = true;
+      currentStep = 0;
+      
+      // Preparar elementos de animación
+      prepararAnimacion();
+      
+      // Mostrar barra de progreso
+      progressContainer.style.display = "block";
+      progressBar.style.width = "0%";
+      
+      // Iniciar bucle de animación
+      animationId = requestAnimationFrame(dibujarFrame);
+    }
+
+    // Inicializar
+    function iniciar() {
+      ajustarTamano();
+      fondoSutil();
+    }
+
+    // Configurar eventos
+    window.addEventListener("resize", () => {
+      ajustarTamano();
+      if (!isAnimating) {
+        fondoSutil();
+      }
+    });
+    
+    btnRamo.addEventListener("click", iniciarAnimacion);
+    canvas.addEventListener("click", iniciarAnimacion);
+
+    // Iniciar
+    iniciar();
+  </script>
+</body>
+</html>
